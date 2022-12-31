@@ -3,6 +3,16 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 namespace WebApplication2;
 
+public enum ImageType
+{
+    Unknown,
+    Png,
+    Gif,
+    Jpeg,
+    Bmp,
+    Tiff
+}
+
 public class UploadImageController
 {
     private readonly IPostgresAccess _postgresAccess;
@@ -39,6 +49,14 @@ public class UploadImageController
         await stream.CopyToAsync(memoryStream);
         byte[] imageData = memoryStream.ToArray();
 
+        if (GetContentType(imageData) == ImageType.Unknown)
+        {
+            return Results.BadRequest(new
+            {
+                Error = "File uploaded is not of common image types."
+            });
+        }
+        
         string sha256Hash = await _postgresAccess.UploadImage(imageData);
         return Results.Ok(new
         {
@@ -46,4 +64,33 @@ public class UploadImageController
             retrieveUrl = $"/api/RetrieveImage/{sha256Hash}"
         });
     }
+    
+    private ImageType GetContentType(byte[] bytes)
+    {
+        if (bytes.Length < 4)
+            return ImageType.Unknown;
+        
+        // check the magic numbers
+        if (bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
+            return ImageType.Png;
+        
+        if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38)
+            return ImageType.Gif;
+        
+        if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+            return ImageType.Jpeg;
+        
+        if (bytes[0] == 0x42 && bytes[1] == 0x4D)
+            return ImageType.Bmp;
+        
+        if (bytes[0] == 0x49 && bytes[1] == 0x49 && bytes[2] == 0x2A && bytes[3] == 0x00)
+            return ImageType.Tiff;
+        
+        if (bytes[0] == 0x4D && bytes[1] == 0x4D && bytes[2] == 0x00 && bytes[3] == 0x2A)
+            return ImageType.Tiff;
+        
+
+        return ImageType.Unknown;
+    }
+
 }

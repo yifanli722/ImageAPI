@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using WebApplication2;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,4 +18,4 @@ app.MapPost("/api/ImageUpload/", imageUploadDelegate);
 app.Run($"http://localhost:{builder.Configuration["ApiPort"]}");
 
 delegate Task<IResult> RetrieveImageDelegate(string imageHash);
-delegate Task<string> UploadImageDelegate(HttpRequest request);
+delegate Task<IResult> UploadImageDelegate(HttpRequest request);

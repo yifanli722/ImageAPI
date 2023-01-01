@@ -25,12 +25,18 @@ public class UploadImageController
     public async Task<IResult> RetrieveImage(string imageHash)
     {
         byte[]? imageData = await _postgresAccess.RetrieveImage(imageHash);
-        return imageData is null ? 
-            Results.NotFound(new
+        if (imageData is null)
+        {
+            return Results.NotFound(new
             {
                 Error = $"No file found with hash {imageHash}"
-            }) : 
-            Results.File(imageData, "image/jpeg");
+            });
+        }
+        ImageType type = GetContentType(imageData);
+        return type is ImageType.Gif or ImageType.Png or ImageType.Jpeg
+            ? Results.File(imageData, $"image/{type}")
+            : Results.File(imageData);
+
     }
     
     public async Task<IResult> UploadImage(HttpRequest request)
@@ -49,19 +55,35 @@ public class UploadImageController
         await stream.CopyToAsync(memoryStream);
         byte[] imageData = memoryStream.ToArray();
 
-        if (GetContentType(imageData) == ImageType.Unknown)
+        ImageType type = GetContentType(imageData);
+        switch (type)
         {
-            return Results.BadRequest(new
-            {
-                Error = "File uploaded is not of common image types."
-            });
+            case ImageType.Gif:
+            case ImageType.Jpeg:
+            case ImageType.Png:
+                string sha256Hash = await _postgresAccess.UploadImage(imageData);
+                return Results.Ok(new
+                {
+                    sha256Hash,
+                    retrieveUrl = $"/api/RetrieveImage/{sha256Hash}"
+                });
+            case ImageType.Bmp:
+            case ImageType.Tiff:
+            case ImageType.Unknown:
+            default:
+                return Results.BadRequest(new
+                {
+                    Error = "File uploaded is not of GIF, Jpeg/Jpg, or PNG"
+                });
         }
-        
-        string sha256Hash = await _postgresAccess.UploadImage(imageData);
+    }
+
+    public async Task<IResult> DeleteImage(string imageHash)
+    {
+        int rowsAffected = await _postgresAccess.DeleteImage(imageHash);
         return Results.Ok(new
         {
-            sha256Hash,
-            retrieveUrl = $"/api/RetrieveImage/{sha256Hash}"
+            rowsAffected
         });
     }
     

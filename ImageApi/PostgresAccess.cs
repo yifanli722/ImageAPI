@@ -8,6 +8,7 @@ public interface IPostgresAccess
 {
     Task<string> UploadImage(byte[] imageData);
     Task<byte[]?> RetrieveImage(string imageHash);
+    Task<int> DeleteImage(string imageHash);
 }
 
 public class PostgresAccess : IPostgresAccess
@@ -66,6 +67,18 @@ public class PostgresAccess : IPostgresAccess
 
                 return imageData;
             }
+        }
+    }
+
+    public async Task<int> DeleteImage(string imageHash)
+    {
+        string sql = await File.ReadAllTextAsync("./Postgres_Scripts/Delete_Image.sql");
+        using var conn = new NpgsqlConnection(_connectionStr);
+        conn.Open();
+        using (var cmd = new NpgsqlCommand(sql, conn))
+        {
+            cmd.Parameters.AddWithValue("@img_hash_full", imageHash);
+            return cmd.ExecuteNonQuery();
         }
     }
 
